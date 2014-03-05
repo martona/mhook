@@ -670,15 +670,13 @@ BOOL Mhook_SetHook(PVOID *ppSystemFunction, PVOID pHookFunction) {
 		pTrampoline = TrampolineAlloc((PBYTE)pSystemFunction, patchdata.nLimitUp, patchdata.nLimitDown);
 		if (pTrampoline) {
 			ODPRINTF((L"mhooks: Mhook_SetHook: allocated structure at %p", pTrampoline));
-			// open ourselves so we can VirtualProtectEx
-			HANDLE hProc = GetCurrentProcess();
 			DWORD dwOldProtectSystemFunction = 0;
 			DWORD dwOldProtectTrampolineFunction = 0;
 			// set the system function to PAGE_EXECUTE_READWRITE
-			if (VirtualProtectEx(hProc, pSystemFunction, dwInstructionLength, PAGE_EXECUTE_READWRITE, &dwOldProtectSystemFunction)) {
+			if (VirtualProtect(pSystemFunction, dwInstructionLength, PAGE_EXECUTE_READWRITE, &dwOldProtectSystemFunction)) {
 				ODPRINTF((L"mhooks: Mhook_SetHook: readwrite set on system function"));
 				// mark our trampoline buffer to PAGE_EXECUTE_READWRITE
-				if (VirtualProtectEx(hProc, pTrampoline, sizeof(MHOOKS_TRAMPOLINE), PAGE_EXECUTE_READWRITE, &dwOldProtectTrampolineFunction)) {
+				if (VirtualProtect(pTrampoline, sizeof(MHOOKS_TRAMPOLINE), PAGE_EXECUTE_READWRITE, &dwOldProtectTrampolineFunction)) {
 					ODPRINTF((L"mhooks: Mhook_SetHook: readwrite set on trampoline structure"));
 
 					// create our trampoline function
@@ -710,7 +708,7 @@ BOOL Mhook_SetHook(PVOID *ppSystemFunction, PVOID pHookFunction) {
 						pbCode = pTrampoline->codeJumpToHookFunction;
 						pbCode = EmitJump(pbCode, (PBYTE)pHookFunction);
 						ODPRINTF((L"mhooks: Mhook_SetHook: created reverse trampoline"));
-						FlushInstructionCache(hProc, pTrampoline->codeJumpToHookFunction, 
+						FlushInstructionCache(GetCurrentProcess(), pTrampoline->codeJumpToHookFunction, 
 							pbCode - pTrampoline->codeJumpToHookFunction);
 
 						// update the API itself
@@ -729,16 +727,16 @@ BOOL Mhook_SetHook(PVOID *ppSystemFunction, PVOID pHookFunction) {
 					pTrampoline->pHookFunction = (PBYTE)pHookFunction;
 
 					// flush instruction cache and restore original protection
-					FlushInstructionCache(hProc, pTrampoline->codeTrampoline, dwInstructionLength);
-					VirtualProtectEx(hProc, pTrampoline, sizeof(MHOOKS_TRAMPOLINE), dwOldProtectTrampolineFunction, &dwOldProtectTrampolineFunction);
+					FlushInstructionCache(GetCurrentProcess(), pTrampoline->codeTrampoline, dwInstructionLength);
+					VirtualProtect(pTrampoline, sizeof(MHOOKS_TRAMPOLINE), dwOldProtectTrampolineFunction, &dwOldProtectTrampolineFunction);
 				} else {
-					ODPRINTF((L"mhooks: Mhook_SetHook: failed VirtualProtectEx 2: %d", gle()));
+					ODPRINTF((L"mhooks: Mhook_SetHook: failed VirtualProtect 2: %d", gle()));
 				}
 				// flush instruction cache and restore original protection
-				FlushInstructionCache(hProc, pSystemFunction, dwInstructionLength);
-				VirtualProtectEx(hProc, pSystemFunction, dwInstructionLength, dwOldProtectSystemFunction, &dwOldProtectSystemFunction);
+				FlushInstructionCache(GetCurrentProcess(), pSystemFunction, dwInstructionLength);
+				VirtualProtect(pSystemFunction, dwInstructionLength, dwOldProtectSystemFunction, &dwOldProtectSystemFunction);
 			} else {
-				ODPRINTF((L"mhooks: Mhook_SetHook: failed VirtualProtectEx 1: %d", gle()));
+				ODPRINTF((L"mhooks: Mhook_SetHook: failed VirtualProtect 1: %d", gle()));
 			}
 			if (pTrampoline->pSystemFunction) {
 				// this is what the application will use as the entry point
@@ -771,19 +769,17 @@ BOOL Mhook_Unhook(PVOID *ppHookedFunction) {
 		// make sure nobody's executing code where we're about to overwrite a few bytes
 		SuspendOtherThreads(pTrampoline->pSystemFunction, pTrampoline->cbOverwrittenCode);
 		ODPRINTF((L"mhooks: Mhook_Unhook: found struct at %p", pTrampoline));
-		// open ourselves so we can VirtualProtectEx
-		HANDLE hProc = GetCurrentProcess();
 		DWORD dwOldProtectSystemFunction = 0;
 		// make memory writable
-		if (VirtualProtectEx(hProc, pTrampoline->pSystemFunction, pTrampoline->cbOverwrittenCode, PAGE_EXECUTE_READWRITE, &dwOldProtectSystemFunction)) {
+		if (VirtualProtect(pTrampoline->pSystemFunction, pTrampoline->cbOverwrittenCode, PAGE_EXECUTE_READWRITE, &dwOldProtectSystemFunction)) {
 			ODPRINTF((L"mhooks: Mhook_Unhook: readwrite set on system function"));
 			PBYTE pbCode = (PBYTE)pTrampoline->pSystemFunction;
 			for (DWORD i = 0; i<pTrampoline->cbOverwrittenCode; i++) {
 				pbCode[i] = pTrampoline->codeUntouched[i];
 			}
 			// flush instruction cache and make memory unwritable
-			FlushInstructionCache(hProc, pTrampoline->pSystemFunction, pTrampoline->cbOverwrittenCode);
-			VirtualProtectEx(hProc, pTrampoline->pSystemFunction, pTrampoline->cbOverwrittenCode, dwOldProtectSystemFunction, &dwOldProtectSystemFunction);
+			FlushInstructionCache(GetCurrentProcess(), pTrampoline->pSystemFunction, pTrampoline->cbOverwrittenCode);
+			VirtualProtect(pTrampoline->pSystemFunction, pTrampoline->cbOverwrittenCode, dwOldProtectSystemFunction, &dwOldProtectSystemFunction);
 			// return the original function pointer
 			*ppHookedFunction = pTrampoline->pSystemFunction;
 			bRet = TRUE;
@@ -792,7 +788,7 @@ BOOL Mhook_Unhook(PVOID *ppHookedFunction) {
 			TrampolineFree(pTrampoline, FALSE);
 			ODPRINTF((L"mhooks: Mhook_Unhook: unhook successful"));
 		} else {
-			ODPRINTF((L"mhooks: Mhook_Unhook: failed VirtualProtectEx 1: %d", gle()));
+			ODPRINTF((L"mhooks: Mhook_Unhook: failed VirtualProtect 1: %d", gle()));
 		}
 		// make the other guys runnable
 		ResumeOtherThreads();
