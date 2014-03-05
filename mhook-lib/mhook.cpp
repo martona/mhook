@@ -197,6 +197,11 @@ static PBYTE SkipJumps(PBYTE pbCode) {
 		INT32 lOffset = *(INT32 *)&pbCode[2];
 		// ... that shows us an absolute pointer
 		return SkipJumps(*(PBYTE*)(pbCode + 6 + lOffset));
+	} else if (pbCode[0] == 0x48 && pbCode[1] == 0xff && pbCode[2] == 0x25) {
+		// or we can have the same with a REX prefix
+		INT32 lOffset = *(INT32 *)&pbCode[3];
+		// ... that shows us an absolute pointer
+		return SkipJumps(*(PBYTE*)(pbCode + 7 + lOffset));
 #endif
 	} else if (pbCode[0] == 0xe9) {
 		// here the behavior is identical, we have...
