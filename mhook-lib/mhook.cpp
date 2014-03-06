@@ -110,8 +110,9 @@ struct MHOOKS_TRAMPOLINE {
 															//   in the original location
 	BYTE	codeUntouched[MHOOKS_MAX_CODE_BYTES];			// placeholder for unmodified original code
 															//   (we patch IP-relative addressing)
+	MHOOKS_TRAMPOLINE* pPrevTrampoline;						// When in the free list, thess are pointers to the prev and next entry.
+	MHOOKS_TRAMPOLINE* pNextTrampoline;						// When not in the free list, this is a pointer to the prev and next trampoline in use.
 };
-
 
 //=========================================================================
 // The patch data structures - store info about rip-relative instructions
@@ -134,26 +135,28 @@ struct MHOOKS_PATCHDATA
 // Global vars
 static BOOL g_bVarsInitialized = FALSE;
 static CRITICAL_SECTION g_cs;
-static MHOOKS_TRAMPOLINE* g_pHooks[MHOOKS_MAX_SUPPORTED_HOOKS];
+static MHOOKS_TRAMPOLINE* g_pHooks = NULL;
+static MHOOKS_TRAMPOLINE* g_pFreeList = NULL;
 static DWORD g_nHooksInUse = 0;
 static HANDLE* g_hThreadHandles = NULL;
 static DWORD g_nThreadHandles = 0;
 #define MHOOK_JMPSIZE 5
+#define MHOOK_MINALLOCSIZE 4096
 
 //=========================================================================
 // Toolhelp defintions so the functions can be dynamically bound to
 typedef HANDLE (WINAPI * _CreateToolhelp32Snapshot)(
-	DWORD dwFlags,       
+	DWORD dwFlags,	   
 	DWORD th32ProcessID  
 	);
 
 typedef BOOL (WINAPI * _Thread32First)(
-									   HANDLE hSnapshot,     
+									   HANDLE hSnapshot,	 
 									   LPTHREADENTRY32 lpte
 									   );
 
 typedef BOOL (WINAPI * _Thread32Next)(
-									  HANDLE hSnapshot,     
+									  HANDLE hSnapshot,	 
 									  LPTHREADENTRY32 lpte
 									  );
 
@@ -164,10 +167,47 @@ _Thread32First fnThread32First = (_Thread32First) GetProcAddress(GetModuleHandle
 _Thread32Next fnThread32Next = (_Thread32Next) GetProcAddress(GetModuleHandle(L"kernel32"), "Thread32Next");
 
 //=========================================================================
+// Internal function:
+//
+// Remove the trampoline from the specified list, updating the head pointer
+// if necessary.
+//=========================================================================
+static VOID ListRemove(MHOOKS_TRAMPOLINE** pListHead, MHOOKS_TRAMPOLINE* pNode) {
+	if (pNode->pPrevTrampoline) {
+		pNode->pPrevTrampoline->pNextTrampoline = pNode->pNextTrampoline;
+	}
+
+	if (pNode->pNextTrampoline) {
+		pNode->pNextTrampoline->pPrevTrampoline = pNode->pPrevTrampoline;
+	}
+
+	if ((*pListHead) == pNode) {
+		(*pListHead) = pNode->pNextTrampoline;
+		assert((*pListHead)->pPrevTrampoline == NULL);
+	}
+
+	pNode->pPrevTrampoline = NULL;
+	pNode->pNextTrampoline = NULL;
+}
+
+//=========================================================================
+// Internal function:
+//
+// Prepend the trampoline from the specified list and update the head pointer.
+//=========================================================================
+static VOID ListPrepend(MHOOKS_TRAMPOLINE** pListHead, MHOOKS_TRAMPOLINE* pNode) {
+	pNode->pPrevTrampoline = NULL;
+	pNode->pNextTrampoline = (*pListHead);
+	if ((*pListHead)) {
+		(*pListHead)->pPrevTrampoline = pNode;
+	}
+	(*pListHead) = pNode;
+}
+
+//=========================================================================
 static VOID EnterCritSec() {
 	if (!g_bVarsInitialized) {
 		InitializeCriticalSection(&g_cs);
-		ZeroMemory(g_pHooks, sizeof(g_pHooks));
 		g_bVarsInitialized = TRUE;
 	}
 	EnterCriticalSection(&g_cs);
@@ -265,6 +305,95 @@ static PBYTE EmitJump(PBYTE pbCode, PBYTE pbJumpTo) {
 	return pbCode;
 }
 
+
+//=========================================================================
+// Internal function:
+//
+// Round down to the next multiple of rndDown
+//=========================================================================
+static size_t RoundDown(size_t addr, size_t rndDown)
+{
+	return (addr / rndDown) * rndDown;
+}
+
+//=========================================================================
+// Internal function:
+//
+// Will attempt allocate a block of memory within the specified range, as 
+// near as possible to the specified function.
+//=========================================================================
+static MHOOKS_TRAMPOLINE* BlockAlloc(PBYTE pSystemFunction, PBYTE pbLower, PBYTE pbUpper) {
+	SYSTEM_INFO sSysInfo =  {0};
+	::GetSystemInfo(&sSysInfo);
+
+	// Always allocate in bulk, in case the system actually has a smaller allocation granularity than MINALLOCSIZE.
+	const ptrdiff_t cAllocSize = max(sSysInfo.dwAllocationGranularity, MHOOK_MINALLOCSIZE);
+
+	MHOOKS_TRAMPOLINE* pRetVal = NULL;
+	PBYTE pModuleGuess = (PBYTE) RoundDown((size_t)pSystemFunction, cAllocSize);
+	int loopCount = 0;
+	for (PBYTE pbAlloc = pModuleGuess; pbLower < pbAlloc && pbAlloc < pbUpper; ++loopCount) {
+		// determine current state
+		MEMORY_BASIC_INFORMATION mbi;
+		ODPRINTF((L"mhooks: BlockAlloc: Looking at address %p", pbAlloc));
+		if (!VirtualQuery(pbAlloc, &mbi, sizeof(mbi)))
+			break;
+		// free & large enough?
+		if (mbi.State == MEM_FREE && mbi.RegionSize >= (unsigned)cAllocSize) {
+			// and then try to allocate it
+			pRetVal = (MHOOKS_TRAMPOLINE*) VirtualAlloc(pbAlloc, cAllocSize, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+			if (pRetVal) {
+				size_t trampolineCount = cAllocSize / sizeof(MHOOKS_TRAMPOLINE);
+				ODPRINTF((L"mhooks: BlockAlloc: Allocated block at %p as %d trampolines", pRetVal, trampolineCount));
+
+				pRetVal[0].pPrevTrampoline = NULL;
+				pRetVal[0].pNextTrampoline = &pRetVal[1];
+
+				// prepare them by having them point down the line at the next entry.
+				for (size_t s = 1; s < trampolineCount; ++s) {
+					pRetVal[s].pPrevTrampoline = &pRetVal[s - 1];
+					pRetVal[s].pNextTrampoline = &pRetVal[s + 1];
+				}
+
+				// last entry points to the current head of the free list
+				pRetVal[trampolineCount - 1].pNextTrampoline = g_pFreeList;
+				break;
+			}
+		}
+				
+		// This is a spiral, should be -1, 1, -2, 2, -3, 3, etc. (* cAllocSize)
+		ptrdiff_t bytesToOffset = (cAllocSize * (loopCount + 1) * ((loopCount % 2 == 0) ? -1 : 1));
+		pbAlloc = pbAlloc + bytesToOffset;
+	}
+	
+	return pRetVal;
+}
+
+//=========================================================================
+// Internal function:
+//
+// Will try to allocate a big block of memory inside the required range. 
+//=========================================================================
+static MHOOKS_TRAMPOLINE* FindTrampolineInRange(PBYTE pLower, PBYTE pUpper) {
+	if (!g_pFreeList) {
+		return NULL;
+	}
+
+	// This is a standard free list, except we're doubly linked to deal with soem return shenanigans.
+	MHOOKS_TRAMPOLINE* curEntry = g_pFreeList;
+	while (curEntry) {
+		if ((MHOOKS_TRAMPOLINE*) pLower < curEntry && curEntry < (MHOOKS_TRAMPOLINE*) pUpper) {
+			ListRemove(&g_pFreeList, curEntry);
+
+			return curEntry;
+		}
+
+		curEntry = curEntry->pNextTrampoline;
+	}
+
+	return NULL;
+}
+
 //=========================================================================
 // Internal function:
 //
@@ -275,56 +404,29 @@ static MHOOKS_TRAMPOLINE* TrampolineAlloc(PBYTE pSystemFunction, S64 nLimitUp, S
 
 	MHOOKS_TRAMPOLINE* pTrampoline = NULL;
 
-	// do we have room to store this guy?
-	if (g_nHooksInUse < MHOOKS_MAX_SUPPORTED_HOOKS) {
+	// determine lower and upper bounds for the allocation locations.
+	// in the basic scenario this is +/- 2GB but IP-relative instructions
+	// found in the original code may require a smaller window.
+	PBYTE pLower = pSystemFunction + nLimitUp;
+	pLower = pLower < (PBYTE)(DWORD_PTR)0x0000000080000000 ? 
+						(PBYTE)(0x1) : (PBYTE)(pLower - (PBYTE)0x7fff0000);
+	PBYTE pUpper = pSystemFunction + nLimitDown;
+	pUpper = pUpper < (PBYTE)(DWORD_PTR)0xffffffff80000000 ? 
+		(PBYTE)(pUpper + (DWORD_PTR)0x7ff80000) : (PBYTE)(DWORD_PTR)0xfffffffffff80000;
+	ODPRINTF((L"mhooks: TrampolineAlloc: Allocating for %p between %p and %p", pSystemFunction, pLower, pUpper));
 
-		// determine lower and upper bounds for the allocation locations.
-		// in the basic scenario this is +/- 2GB but IP-relative instructions
-		// found in the original code may require a smaller window.
-		PBYTE pLower = pSystemFunction + nLimitUp;
-		pLower = pLower < (PBYTE)(DWORD_PTR)0x0000000080000000 ? 
-							(PBYTE)(0x1) : (PBYTE)(pLower - (PBYTE)0x7fff0000);
-		PBYTE pUpper = pSystemFunction + nLimitDown;
-		pUpper = pUpper < (PBYTE)(DWORD_PTR)0xffffffff80000000 ? 
-			(PBYTE)(pUpper + (DWORD_PTR)0x7ff80000) : (PBYTE)(DWORD_PTR)0xfffffffffff80000;
-		ODPRINTF((L"mhooks: TrampolineAlloc: Allocating for %p between %p and %p", pSystemFunction, pLower, pUpper));
+	// try to find a trampoline in the specified range
+	pTrampoline = FindTrampolineInRange(pLower, pUpper);
+	if (!pTrampoline) {
+		// if it we can't find it, then we need to allocate a new block and 
+		// try again. Just fail if that doesn't work 
+		g_pFreeList = BlockAlloc(pSystemFunction, pLower, pUpper);
+		pTrampoline = FindTrampolineInRange(pLower, pUpper);
+	}
 
-		SYSTEM_INFO sSysInfo =  {0};
-		::GetSystemInfo(&sSysInfo);
-
-		// go through the available memory blocks and try to allocate a chunk for us
-		for (PBYTE pbAlloc = pLower; pbAlloc < pUpper;) {
-			// determine current state
-			MEMORY_BASIC_INFORMATION mbi;
-			ODPRINTF((L"mhooks: TrampolineAlloc: Looking at address %p", pbAlloc));
-			if (!VirtualQuery(pbAlloc, &mbi, sizeof(mbi)))
-				break;
-			// free & large enough?
-			if (mbi.State == MEM_FREE && mbi.RegionSize >= sizeof(MHOOKS_TRAMPOLINE) && mbi.RegionSize >= sSysInfo.dwAllocationGranularity) {
-				// yes, align the pointer to the 64K boundary first
-				pbAlloc = (PBYTE)(ULONG_PTR((ULONG_PTR(pbAlloc) + (sSysInfo.dwAllocationGranularity-1)) / sSysInfo.dwAllocationGranularity) * sSysInfo.dwAllocationGranularity);
-				// and then try to allocate it
-				pTrampoline = (MHOOKS_TRAMPOLINE*)VirtualAlloc(pbAlloc, sizeof(MHOOKS_TRAMPOLINE), MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READ);
-				if (pTrampoline) {
-					ODPRINTF((L"mhooks: TrampolineAlloc: Allocated block at %p as the trampoline", pTrampoline));
-					break;
-				}
-			}
-			// continue the search
-			pbAlloc = (PBYTE)mbi.BaseAddress + mbi.RegionSize;
-		}
-
-		// found and allocated a trampoline?
-		if (pTrampoline) {
-			// put it into our list so we know we'll have to free it
-			for (DWORD i=0; i<MHOOKS_MAX_SUPPORTED_HOOKS; i++) {
-				if (g_pHooks[i] == NULL) {
-					g_pHooks[i] = pTrampoline;
-					g_nHooksInUse++;
-					break;
-				}
-			}
-		}
+	// found and allocated a trampoline?
+	if (pTrampoline) {
+		ListPrepend(&g_pHooks, pTrampoline);
 	}
 
 	return pTrampoline;
@@ -336,12 +438,16 @@ static MHOOKS_TRAMPOLINE* TrampolineAlloc(PBYTE pSystemFunction, S64 nLimitUp, S
 // Return the internal trampoline structure that belongs to a hooked function.
 //=========================================================================
 static MHOOKS_TRAMPOLINE* TrampolineGet(PBYTE pHookedFunction) {
-	for (DWORD i=0; i<MHOOKS_MAX_SUPPORTED_HOOKS; i++) {
-		if (g_pHooks[i]) {
-			if (g_pHooks[i]->codeTrampoline == pHookedFunction)
-				return g_pHooks[i];
+	MHOOKS_TRAMPOLINE* pCurrent = g_pHooks;
+
+	while (pCurrent) {
+		if (pCurrent->pHookFunction == pHookedFunction) {
+			return pCurrent;
 		}
+
+		pCurrent = pCurrent->pNextTrampoline;
 	}
+
 	return NULL;
 }
 
@@ -351,20 +457,17 @@ static MHOOKS_TRAMPOLINE* TrampolineGet(PBYTE pHookedFunction) {
 // Free a trampoline structure.
 //=========================================================================
 static VOID TrampolineFree(MHOOKS_TRAMPOLINE* pTrampoline, BOOL bNeverUsed) {
-	for (DWORD i=0; i<MHOOKS_MAX_SUPPORTED_HOOKS; i++) {
-		if (g_pHooks[i] == pTrampoline) {
-			g_pHooks[i] = NULL;
-			// It might be OK to call VirtualFree, but quite possibly it isn't: 
-			// If a thread has some of our trampoline code on its stack
-			// and we yank the region from underneath it then it will
-			// surely crash upon returning. So instead of freeing the 
-			// memory we just let it leak. Ugly, but safe.
-			if (bNeverUsed)
-				VirtualFree(pTrampoline, 0, MEM_RELEASE);
-			g_nHooksInUse--;
-			break;
-		}
+	ListRemove(&g_pHooks, pTrampoline);
+
+	// If a thread could feasinbly have some of our trampoline code 
+	// on its stack and we yank the region from underneath it then it will
+	// surely crash upon returning. So instead of freeing the 
+	// memory we just let it leak. Ugly, but safe.
+	if (bNeverUsed) {
+		ListPrepend(&g_pFreeList, pTrampoline);
 	}
+
+	g_nHooksInUse--;
 }
 
 //=========================================================================
