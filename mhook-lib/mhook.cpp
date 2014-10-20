@@ -183,7 +183,9 @@ static VOID ListRemove(MHOOKS_TRAMPOLINE** pListHead, MHOOKS_TRAMPOLINE* pNode) 
 
 	if ((*pListHead) == pNode) {
 		(*pListHead) = pNode->pNextTrampoline;
-		assert((*pListHead)->pPrevTrampoline == NULL);
+		if (*pListHead != NULL) {
+			assert((*pListHead)->pPrevTrampoline == NULL);
+		}
 	}
 
 	pNode->pPrevTrampoline = NULL;
@@ -441,7 +443,7 @@ static MHOOKS_TRAMPOLINE* TrampolineGet(PBYTE pHookedFunction) {
 	MHOOKS_TRAMPOLINE* pCurrent = g_pHooks;
 
 	while (pCurrent) {
-		if (pCurrent->pHookFunction == pHookedFunction) {
+		if ((PBYTE)&(pCurrent->codeTrampoline) == pHookedFunction) {
 			return pCurrent;
 		}
 
