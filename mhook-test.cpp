@@ -136,7 +136,7 @@ int wmain(int argc, WCHAR* argv[])
 			printf("Could not open self: %d\n", GetLastError());
 		}
 		// Remove the hook
-		Mhook_Unhook((PVOID*)&TrueNtOpenProcess);
+		Mhook_Unhook((PVOID)HookNtOpenProcess); //Mod
 	}
 
 	// Call OpenProces again - this time there won't be a redirection as
@@ -167,7 +167,7 @@ int wmain(int argc, WCHAR* argv[])
 		DeleteDC(hdcMem);
 		ReleaseDC(NULL, hdc);
 		// Remove the hook
-		Mhook_Unhook((PVOID*)&TrueSelectObject);
+		Mhook_Unhook((PVOID)HookSelectobject); //Mod
 	}
 
 	printf("Testing getaddrinfo.\n");
@@ -194,7 +194,7 @@ int wmain(int argc, WCHAR* argv[])
 		}
 		WSACleanup();
 		// Remove the hook
-		Mhook_Unhook((PVOID*)&Truegetaddrinfo);
+		Mhook_Unhook((PVOID)Hookgetaddrinfo); //Mod
 	}
 
 	printf("Testing HeapAlloc.\n");
@@ -202,7 +202,7 @@ int wmain(int argc, WCHAR* argv[])
 	{
 		free(malloc(10));
 		// Remove the hook
-		Mhook_Unhook((PVOID*)&TrueHeapAlloc);
+		Mhook_Unhook((PVOID)HookHeapAlloc); //Mod
 	}
 
 	printf("Testing NtClose.\n");
@@ -210,7 +210,7 @@ int wmain(int argc, WCHAR* argv[])
 	{
 		CloseHandle(NULL);
 		// Remove the hook
-		Mhook_Unhook((PVOID*)&TrueNtClose);
+		Mhook_Unhook((PVOID)HookNtClose); //Mod
 	}
 
 	return 0;
