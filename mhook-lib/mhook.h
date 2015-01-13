@@ -25,4 +25,4 @@
 #endif
 
 BOOL Mhook_SetHook(PVOID *ppSystemFunction, PVOID pHookFunction);
-BOOL Mhook_Unhook(PVOID *ppHookedFunction);
+BOOL Mhook_Unhook(PVOID pHookFunction);
