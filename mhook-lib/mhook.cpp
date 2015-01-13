@@ -877,12 +877,12 @@ BOOL Mhook_SetHook(PVOID *ppSystemFunction, PVOID pHookFunction) {
 }
 
 //=========================================================================
-BOOL Mhook_Unhook(PVOID *ppHookedFunction) {
-	ODPRINTF((L"mhooks: Mhook_Unhook: %p", *ppHookedFunction));
+BOOL Mhook_Unhook(PVOID ppSystemFunction) {
+	ODPRINTF((L"mhooks: Mhook_Unhook: %p", ppSystemFunction));//Mod
 	BOOL bRet = FALSE;
 	EnterCritSec();
 	// get the trampoline structure that corresponds to our function
-	MHOOKS_TRAMPOLINE* pTrampoline = TrampolineGet((PBYTE)*ppHookedFunction);
+	MHOOKS_TRAMPOLINE* pTrampoline = TrampolineGet((PBYTE)ppSystemFunction);//Mod
 	if (pTrampoline) {
 		// make sure nobody's executing code where we're about to overwrite a few bytes
 		SuspendOtherThreads(pTrampoline->pSystemFunction, pTrampoline->cbOverwrittenCode);
@@ -899,9 +899,9 @@ BOOL Mhook_Unhook(PVOID *ppHookedFunction) {
 			FlushInstructionCache(GetCurrentProcess(), pTrampoline->pSystemFunction, pTrampoline->cbOverwrittenCode);
 			VirtualProtect(pTrampoline->pSystemFunction, pTrampoline->cbOverwrittenCode, dwOldProtectSystemFunction, &dwOldProtectSystemFunction);
 			// return the original function pointer
-			*ppHookedFunction = pTrampoline->pSystemFunction;
+			ppSystemFunction = (PVOID)pTrampoline->pSystemFunction; //Mod
 			bRet = TRUE;
-			ODPRINTF((L"mhooks: Mhook_Unhook: sysfunc: %p", *ppHookedFunction));
+			ODPRINTF((L"mhooks: Mhook_Unhook: sysfunc: %p", ppSystemFunction)); //Mod
 			// free the trampoline while not really discarding it from memory
 			TrampolineFree(pTrampoline, FALSE);
 			ODPRINTF((L"mhooks: Mhook_Unhook: unhook successful"));
