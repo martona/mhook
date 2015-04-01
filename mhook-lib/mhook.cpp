@@ -362,7 +362,7 @@ static MHOOKS_TRAMPOLINE* BlockAlloc(PBYTE pSystemFunction, PBYTE pbLower, PBYTE
 		}
 				
 		// This is a spiral, should be -1, 1, -2, 2, -3, 3, etc. (* cAllocSize)
-		ptrdiff_t bytesToOffset = (cAllocSize * (loopCount + 1) * ((loopCount % 2 == 0) ? -1 : 1));
+		ptrdiff_t bytesToOffset = (cAllocSize * (loopCount / 2 + 1) * ((loopCount % 2 == 0) ? -1 : 1));
 		pbAlloc = pbAlloc + bytesToOffset;
 	}
 	
