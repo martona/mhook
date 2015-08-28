@@ -53,16 +53,16 @@ typedef ULONG (WINAPI* _NtClose)(IN HANDLE Handle);
 // Get the current (original) address to the functions to be hooked
 //
 _NtOpenProcess TrueNtOpenProcess = (_NtOpenProcess)
-	GetProcAddress(GetModuleHandle(L"ntdll"), "NtOpenProcess");
+	GetProcAddress(GetModuleHandleW(L"ntdll"), "NtOpenProcess");
 
 _SelectObject TrueSelectObject = (_SelectObject)
-	GetProcAddress(GetModuleHandle(L"gdi32"), "SelectObject");
+	GetProcAddress(GetModuleHandleW(L"gdi32"), "SelectObject");
 
-_getaddrinfo Truegetaddrinfo = (_getaddrinfo)GetProcAddress(GetModuleHandle(L"ws2_32"), "getaddrinfo");
+_getaddrinfo Truegetaddrinfo = (_getaddrinfo)GetProcAddress(GetModuleHandleW(L"ws2_32"), "getaddrinfo");
 
-_HeapAlloc TrueHeapAlloc = (_HeapAlloc)GetProcAddress(GetModuleHandle(L"kernel32"), "HeapAlloc");
+_HeapAlloc TrueHeapAlloc = (_HeapAlloc)GetProcAddress(GetModuleHandleW(L"kernel32"), "HeapAlloc");
 
-_NtClose TrueNtClose = (_NtClose)GetProcAddress(GetModuleHandle(L"ntdll"), "NtClose");
+_NtClose TrueNtClose = (_NtClose)GetProcAddress(GetModuleHandleW(L"ntdll"), "NtClose");
 
 //=========================================================================
 // This is the function that will replace NtOpenProcess once the hook 
