@@ -441,7 +441,7 @@ static MHOOKS_TRAMPOLINE* TrampolineGet(PBYTE pHookedFunction) {
 	MHOOKS_TRAMPOLINE* pCurrent = g_pHooks;
 
 	while (pCurrent) {
-		if (pCurrent->pHookFunction == pHookedFunction) {
+		if (pCurrent->codeTrampoline == pHookedFunction) {
 			return pCurrent;
 		}
 
