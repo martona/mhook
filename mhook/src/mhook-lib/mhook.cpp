@@ -21,7 +21,7 @@
 #include <windows.h>
 #include <tlhelp32.h>
 #include <stdio.h>
-#include "mhook.h"
+#include "mhook/mhook.h"
 #include "../disasm-lib/disasm.h"
 
 //=========================================================================
