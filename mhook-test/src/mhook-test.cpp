@@ -19,7 +19,7 @@
 //IN THE SOFTWARE.
 
 #include "stdafx.h"
-#include "mhook-lib/mhook.h"
+#include <mhook/mhook.h>
 
 //=========================================================================
 // Define _NtOpenProcess so we can dynamically bind to the function
