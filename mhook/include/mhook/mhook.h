@@ -26,3 +26,14 @@
 
 BOOL Mhook_SetHook(PVOID *ppSystemFunction, PVOID pHookFunction);
 BOOL Mhook_Unhook(PVOID *ppHookedFunction);
+
+// optimisation - when setting many hooks CreateToolHelp32Snapshot to enumerate threads
+// can become a bottleneck, allow apps to suspend threads across multiple hooks
+//
+// note - it's the responsibility of user code to ensure that the threads don't have
+// their instruction pointer near any of the hooks - as this would normally be handled
+// on a per-hook basis.
+//
+// these functions are also not thread safe.
+void Mhook_SuspendOtherThreads();
+void Mhook_ResumeOtherThreads();
