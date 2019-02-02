@@ -327,7 +327,7 @@ static MHOOKS_TRAMPOLINE* BlockAlloc(PBYTE pSystemFunction, PBYTE pbLower, PBYTE
 	::GetSystemInfo(&sSysInfo);
 
 	// Always allocate in bulk, in case the system actually has a smaller allocation granularity than MINALLOCSIZE.
-	const ptrdiff_t cAllocSize = max(sSysInfo.dwAllocationGranularity, MHOOK_MINALLOCSIZE);
+	const ptrdiff_t cAllocSize = MAX(sSysInfo.dwAllocationGranularity, MHOOK_MINALLOCSIZE);
 
 	MHOOKS_TRAMPOLINE* pRetVal = NULL;
 	PBYTE pModuleGuess = (PBYTE) RoundDown((size_t)pSystemFunction, cAllocSize);
