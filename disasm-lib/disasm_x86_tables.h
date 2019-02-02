@@ -133,22 +133,22 @@
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-static char *Addressing16[8] = {"bx+si","bx+di","bp+si","bp+di","si","di","bp","bx"};
-static char *MMX_Registers[8] = {"mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7"};
-static char *SSE_Registers[8] = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"};
-static char *DR_Registers[8] = {"dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7"};
-static char *CR_Registers[8] = {"cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7"};
-static char *TR_Registers[8] = {"tr0", "tr1", "tr2", "tr3", "tr4", "tr5", "tr6", "tr7"};
-static char *FPU_Registers[8] = {"st(0)", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"};
-static char *Segments[8] = {"es", "cs", "ss", "ds", "fs", "gs", "ERROR", "ERROR"};
-static char *Registers8[8] = {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh" };
-static char *Registers16[8] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di" };
-static char *Registers32[8] = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi" };
-static char *REX_Registers8[16] = {"al", "cl", "dl", "bl", "spl", "bpl", "sil", "dil", "r8b", "r9b", "r10b", "r11b", "r12b", "r13b", "r14b", "r15b" };
-static char *REX_Registers16[16] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di", "r8w", "r9w", "r10w", "r11w", "r12w", "r13w", "r14w", "r15w" };
-static char *REX_Registers32[16] = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi", "r8d", "r9d", "r10d", "r11d", "r12d", "r13d", "r14d", "r15d" };
-static char *REX_Registers64[16] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" };
-static char *DataSizes[8+1] = {"byte ptr", "word ptr", "dword ptr", "6_byte ptr", "qword ptr", "10_byte ptr", "INVALID PTR", "INVALID PTR", "oword ptr"};
+static const char *Addressing16[8] = {"bx+si","bx+di","bp+si","bp+di","si","di","bp","bx"};
+static const char *MMX_Registers[8] = {"mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7"};
+static const char *SSE_Registers[8] = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"};
+static const char *DR_Registers[8] = {"dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7"};
+static const char *CR_Registers[8] = {"cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7"};
+static const char *TR_Registers[8] = {"tr0", "tr1", "tr2", "tr3", "tr4", "tr5", "tr6", "tr7"};
+static const char *FPU_Registers[8] = {"st(0)", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"};
+static const char *Segments[8] = {"es", "cs", "ss", "ds", "fs", "gs", "ERROR", "ERROR"};
+static const char *Registers8[8] = {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh" };
+static const char *Registers16[8] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di" };
+static const char *Registers32[8] = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi" };
+static const char *REX_Registers8[16] = {"al", "cl", "dl", "bl", "spl", "bpl", "sil", "dil", "r8b", "r9b", "r10b", "r11b", "r12b", "r13b", "r14b", "r15b" };
+static const char *REX_Registers16[16] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di", "r8w", "r9w", "r10w", "r11w", "r12w", "r13w", "r14w", "r15w" };
+static const char *REX_Registers32[16] = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi", "r8d", "r9d", "r10d", "r11d", "r12d", "r13d", "r14d", "r15d" };
+static const char *REX_Registers64[16] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" };
+static const char *DataSizes[8+1] = {"byte ptr", "word ptr", "dword ptr", "6_byte ptr", "qword ptr", "10_byte ptr", "INVALID PTR", "INVALID PTR", "oword ptr"};
 
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
