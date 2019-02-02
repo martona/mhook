@@ -677,7 +677,7 @@ typedef enum _X86_SEGMENT
 	SEG_MAX = 6
 } X86_SEGMENT;
 
-extern char *X86_Registers[];
+extern const char *X86_Registers[];
 
 #pragma pack(push,1)
 typedef struct _MODRM

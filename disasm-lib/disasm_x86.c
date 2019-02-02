@@ -217,7 +217,7 @@ ARCHITECTURE_FORMAT_FUNCTIONS X86 =
 	X86_FindFunctionByPrologue 
 };
 
-char *X86_Registers[0xE0] = 
+const char *X86_Registers[0xE0] = 
 {
 	// Segments
 	"es", // 0x00
