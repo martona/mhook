@@ -176,7 +176,7 @@ int wmain(int argc, WCHAR* argv[])
 		// in this context anyway.
 		WSADATA wd = {0};
 		WSAStartup(MAKEWORD(2, 2), &wd);
-		char* ip = "localhost";
+		const char* ip = "localhost";
 		struct addrinfo aiHints;
 		struct addrinfo *res = NULL;
 		memset(&aiHints, 0, sizeof(aiHints));
