@@ -124,7 +124,7 @@ int wmain(int argc, WCHAR* argv[])
 	HANDLE hProc = NULL;
 
 	// Set the hook
-	if (Mhook_SetHook((PVOID*)&TrueNtOpenProcess, HookNtOpenProcess)) {
+	if (Mhook_SetHook((PVOID*)&TrueNtOpenProcess, (PVOID) HookNtOpenProcess)) {
 		// Now call OpenProcess and observe NtOpenProcess being redirected
 		// under the hood.
 		hProc = OpenProcess(PROCESS_ALL_ACCESS, 
@@ -155,7 +155,7 @@ int wmain(int argc, WCHAR* argv[])
 	// extra work under the hood to make things work properly. This really
 	// is more of a test case rather than a demo.)
 	printf("Testing SelectObject.\n");
-	if (Mhook_SetHook((PVOID*)&TrueSelectObject, HookSelectobject)) {
+	if (Mhook_SetHook((PVOID*)&TrueSelectObject, (PVOID) HookSelectobject)) {
 		// error checking omitted for brevity. doesn't matter much 
 		// in this context anyway.
 		HDC hdc = GetDC(NULL);
@@ -171,7 +171,7 @@ int wmain(int argc, WCHAR* argv[])
 	}
 
 	printf("Testing getaddrinfo.\n");
-	if (Mhook_SetHook((PVOID*)&Truegetaddrinfo, Hookgetaddrinfo)) {
+	if (Mhook_SetHook((PVOID*)&Truegetaddrinfo, (PVOID) Hookgetaddrinfo)) {
 		// error checking omitted for brevity. doesn't matter much 
 		// in this context anyway.
 		WSADATA wd = {0};
@@ -198,7 +198,7 @@ int wmain(int argc, WCHAR* argv[])
 	}
 
 	printf("Testing HeapAlloc.\n");
-	if (Mhook_SetHook((PVOID*)&TrueHeapAlloc, HookHeapAlloc))
+	if (Mhook_SetHook((PVOID*)&TrueHeapAlloc, (PVOID) HookHeapAlloc))
 	{
 		free(malloc(10));
 		// Remove the hook
@@ -206,7 +206,7 @@ int wmain(int argc, WCHAR* argv[])
 	}
 
 	printf("Testing NtClose.\n");
-	if (Mhook_SetHook((PVOID*)&TrueNtClose, HookNtClose))
+	if (Mhook_SetHook((PVOID*)&TrueNtClose, (PVOID) HookNtClose))
 	{
 		CloseHandle(NULL);
 		// Remove the hook
