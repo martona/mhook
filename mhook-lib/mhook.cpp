@@ -355,8 +355,12 @@ static MHOOKS_TRAMPOLINE* BlockAlloc(PBYTE pSystemFunction, PBYTE pbLower, PBYTE
 					pRetVal[s].pNextTrampoline = &pRetVal[s + 1];
 				}
 
-				// last entry points to the current head of the free list
+				// last entry points to the current head of the free list and
+				// the current head points back to the last entry of the new block
 				pRetVal[trampolineCount - 1].pNextTrampoline = g_pFreeList;
+				if (g_pFreeList) {
+					g_pFreeList->pPrevTrampoline = &pRetVal[trampolineCount - 1];
+				}
 				break;
 			}
 		}
